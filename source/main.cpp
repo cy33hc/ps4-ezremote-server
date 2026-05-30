@@ -11,6 +11,7 @@
 #include "server/http_server.h"
 #include "config.h"
 #include "util.h"
+#include "dbglogger.h"
 
 extern "C"
 {
@@ -79,6 +80,9 @@ int main(int argc, char *argv[])
         NetTerm();
         return -1;
     }
+
+    dbglogger_init();
+    dbglogger_log("If you see this you've set up dbglogger correctly.");
 
     CONFIG::LoadPackageInstallHostData();
     CONFIG::LoadBgDownloadData();

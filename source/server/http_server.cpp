@@ -183,11 +183,8 @@ namespace HttpServer
 
     static void DeleteRemoteClient(RemoteClient *tmp_client)
     {
-        if (!dynamic_cast<BaseClient*>(tmp_client))
-        {
-            tmp_client->Quit();
-            delete tmp_client;
-        }
+        tmp_client->Quit();
+        delete tmp_client;
     }
 
     void *DownloadFilesThread(void *argp)
@@ -292,7 +289,9 @@ namespace HttpServer
     void *ServerThread(void *argp)
     {
         svr->Get("/", [&](const Request &req, Response &res)
-                 { res.set_redirect("/index.html"); });
+        {
+            res.set_redirect("/index.html");
+        });
 
         svr->Post("/store_bg_install_data", [&](const Request &req, Response &res)
         {
@@ -340,6 +339,18 @@ namespace HttpServer
             }
         });
 
+        svr->Get("/ls", [&](const Request &req, Response &res)
+        {
+            std::vector<std::string> files = FS::ListFiles("/");
+            std::string out;
+            for (int i=0; i < files.size(); i++)
+            {
+                out.append(files[i]).append("\n");
+            }
+
+            res.set_content(out, "text/plain");
+        });
+
         svr->Get("/bg_install/(.*)", [&](const Request &req, Response &res)
         {
             std::string hash = req.matches[1];
@@ -352,24 +363,7 @@ namespace HttpServer
                 return;
             }
 
-            if (pkg_host_data->host_info.type == CLIENT_TYPE_HTTP_SERVER ||
-                pkg_host_data->host_info.type == CLIENT_TYPE_WEBDAV ||
-                pkg_host_data->host_info.type == CLIENT_TYPE_FILEHOST)
-            {
-                if (pkg_host_data->client == nullptr)
-                {
-                    pkg_host_data->client = GetRemoteClient(&(pkg_host_data->host_info));
-                }
-                else
-                {
-                    tmp_client = pkg_host_data->client;
-                }
-            }
-            else
-            {
-                tmp_client = GetRemoteClient(&(pkg_host_data->host_info));
-            }
-
+            tmp_client = GetRemoteClient(&(pkg_host_data->host_info));
             if (tmp_client == nullptr)
             {
                 res.status = 500;
@@ -378,21 +372,57 @@ namespace HttpServer
 
             std::string path = pkg_host_data->path;
 
-            res.status = 206;
-            size_t range_len = (req.ranges[0].second - req.ranges[0].first) + 1;
-                
-            std::pair<ssize_t, ssize_t> range = req.ranges[0];
-            res.set_content_provider(
-                range_len, "application/octet-stream",
-                [tmp_client, path, range, range_len](size_t offset, size_t length, DataSink &sink) {
-                    int ret;
-                    ret = tmp_client->GetRange(path, sink, range_len, range.first);
-                    return (ret==1);
-                },
-                [tmp_client](bool success) {
-                    DeleteRemoteClient(tmp_client);
-                });
+            /*
+            if (req.method == "HEAD")
+            {
+                int64_t file_size;
+                int ret;
 
+                res.status = 204;
+                res.set_header("Content-Length", std::to_string(pkg_host_data->file_size));
+                res.set_header("Accept-Ranges", "bytes");
+                DeleteRemoteClient(tmp_client);
+                return;
+            }
+            */
+
+            if (req.ranges.empty())
+            {
+                res.status = 200;
+
+                res.set_content_provider(
+                    (1024*128), "application/octet-stream",
+                    [tmp_client, path](size_t offset, size_t length, DataSink &sink) {
+                        int ret = tmp_client->GetRange(path, sink, length, offset);
+                        return (ret == 1);
+                    },
+                    [tmp_client, path](bool success) {
+                        DeleteRemoteClient(tmp_client);
+                    });
+            }
+            else
+            {
+                res.status = 206;
+                size_t range_len = (req.ranges[0].second - req.ranges[0].first) + 1;
+                if (req.ranges[0].second >= 18000000000000000000ul)
+                {
+                    range_len = PKG_INITIAL_REQUEST_SIZE;
+                    res.set_header("Content-Length", std::to_string(range_len));
+                    res.set_header("Content-Range", std::string("bytes ") + std::to_string(req.ranges[0].first)+"-" + std::to_string(req.ranges[0].first+PKG_INITIAL_REQUEST_SIZE-1) + "/"+std::to_string(range_len));
+                }
+
+                std::pair<ssize_t, ssize_t> range = req.ranges[0];
+                res.set_content_provider(
+                    range_len, "application/octet-stream",
+                    [tmp_client, path, range, range_len](size_t offset, size_t length, DataSink &sink) {
+                        int ret;
+                        ret = tmp_client->GetRange(path, sink, range_len, range.first);
+                        return (ret==1);
+                    },
+                    [tmp_client, path, range](bool success) {
+                        DeleteRemoteClient(tmp_client);
+                    });
+            }
         });
 
         svr->Post("/download_url", [&](const Request &req, Response &res)

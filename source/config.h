@@ -11,11 +11,10 @@
 #include "clients/remote_client.h"
 
 #define APP_ID "ezremote-client"
-#define DATA_PATH "/data/homebrew/" APP_ID
+#define DATA_PATH "/data/" APP_ID
 #define PKG_INSTALL_HISTORY_PATH DATA_PATH "/pkg_install_history.json"
 #define BG_DOWNLOAD_HISTORY_PATH DATA_PATH "/bg_download_history.json"
 #define DEBUG_SERVER_LOG_PATH DATA_PATH "/ezremote_server.log"
-#define CLIENT_ELF_PATH DATA_PATH "/ezremote_client.elf"
 
 #define HTTP_SERVER_APACHE "Apache"
 #define HTTP_SERVER_MS_IIS "Microsoft IIS"

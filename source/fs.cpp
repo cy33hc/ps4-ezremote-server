@@ -265,12 +265,14 @@ namespace FS
 
             if (dirent->d_type & DT_DIR)
             {
+                /*
                 std::vector<std::string> files = FS::ListFiles(path + "/" + dirent->d_name);
                 for (std::vector<std::string>::iterator it = files.begin(); it != files.end();)
                 {
                     out.push_back(std::string(dirent->d_name) + "/" + *it);
                     ++it;
                 }
+                */
             }
             else
             {

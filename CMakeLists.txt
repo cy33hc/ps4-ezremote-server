@@ -34,8 +34,6 @@ target_compile_definitions(${PROJECT_NAME}.elf PRIVATE EZREMOTE_VERSION=${APP_VE
 
 target_link_libraries(${PROJECT_NAME}.elf
   z
-  c
-  c++
   crypto
   ssl
   json-c
@@ -46,4 +44,11 @@ target_link_libraries(${PROJECT_NAME}.elf
   SceSysmodule
   SceNet
   SceSystemService
+)
+
+add_custom_target(package
+   DEPENDS ${PROJECT_NAME}.elf
+   COMMAND /opt/ps4-payload-sdk/bin/orbis-strip ${PROJECT_NAME}.elf
+   COMMAND cp ${PROJECT_NAME}.elf ${CMAKE_CURRENT_SOURCE_DIR}/../data/daemon/daemon.elf
+
 )
