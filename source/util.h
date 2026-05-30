@@ -12,21 +12,14 @@
 #include "openssl/md5.h"
 #include "config.h"
 
-#define SCE_NOTIFICATION_LOCAL_USER_ID_SYSTEM 0xFE
-
-typedef struct notify_request
-{
-    char useless1[45];
-    char message[3075];
-} notify_request_t;
-
-/*
-extern "C"
-{
-    int sceKernelSendNotificationRequest(int, notify_request_t *, size_t, int);
-    int sceNotificationSend(int userId, bool isLogged, const char* payload);
+extern "C" {
+int sceKernelSendNotificationRequest(int, void *, size_t, int);
 }
-*/
+
+typedef struct notify_request {
+  char useless1[45];
+  char message[3075];
+} notify_request_t;
 
 namespace Util
 {
@@ -181,153 +174,15 @@ namespace Util
 
     static void Notify(const char *fmt, ...)
     {
-        OrbisNotificationRequest request;
+        notify_request_t req;
+        memset(&req, 0, sizeof(req));
 
         va_list args;
         va_start(args, fmt);
-        vsprintf(request.message, fmt, args);
+        vsprintf(req.message, fmt, args);
         va_end(args);
 
-        request.type = OrbisNotificationRequestType::NotificationRequest;
-        request.unk3 = 0;
-        request.useIconImageUri = 0;
-        request.targetId = -1;
-        sceKernelSendNotificationRequest(0, &request, sizeof(request), 0);
-    }
-
-    static void append_json_escaped(char *dst, size_t dst_size, const char *src)
-    {
-        size_t used = strlen(dst);
-        if (used >= dst_size)
-            return;
-
-        for (; *src != '\0' && used + 1 < dst_size; ++src)
-        {
-            const char *escape = NULL;
-            char single[2] = {0};
-
-            switch (*src)
-            {
-            case '\\':
-                escape = "\\\\";
-                break;
-            case '"':
-                escape = "\\\"";
-                break;
-            case '\n':
-                escape = "\\n";
-                break;
-            case '\r':
-                escape = "\\r";
-                break;
-            case '\t':
-                escape = "\\t";
-                break;
-            default:
-                single[0] = *src;
-                escape = single;
-                break;
-            }
-
-            size_t escape_len = strlen(escape);
-            if (used + escape_len >= dst_size)
-                break;
-            memcpy(dst + used, escape, escape_len);
-            used += escape_len;
-            dst[used] = '\0';
-        }
-    }
-
-    static bool RichNotify(uint64_t id, const char *fmt, ...)
-    {
-        /*
-        va_list args;
-        char message[3072];
-        char escaped_message[4096];
-        char payload[8192];
-        char created_at[32];
-        char notification_id[32];
-
-        va_start(args, fmt);
-        vsnprintf(message, sizeof message, fmt, args);
-        va_end(args);
-
-        escaped_message[0] = '\0';
-        append_json_escaped(escaped_message, sizeof(escaped_message), message);
-
-        struct tm tm_utc;
-        time_t now = time(NULL);
-        gmtime_r(&now, &tm_utc);
-        strftime(created_at, 32, "%Y-%m-%dT%H:%M:%S.000Z", &tm_utc);
-        sprintf(notification_id, "%lu", id);
-
-        int len = snprintf(
-            payload, sizeof(payload),
-            "{\n"
-            "  \"rawData\": {\n"
-            "    \"viewTemplateType\": \"InteractiveToastTemplateB\",\n"
-            "    \"channelType\": \"ServiceFeedback\",\n"
-            "    \"bundleName\": \"ezRemoteClientWelcome\",\n"
-            "    \"useCaseId\": \"IDC\",\n"
-            "    \"soundEffect\": \"none\",\n"
-            "    \"toastOverwriteType\": \"InQueue\",\n"
-            "    \"isImmediate\": true,\n"
-            "    \"priority\": 100,\n"
-            "    \"viewData\": {\n"
-            "      \"icon\": {\n"
-            "        \"type\": \"Url\",\n"
-            "        \"parameters\": {\n"
-            "          \"url\": \"" NOTIFY_ICON_FILE "\"\n"
-            "        }\n"
-            "      },\n"
-            "      \"message\": {\n"
-            "        \"body\": \"%s\"\n"
-            "      },\n"
-            "      \"subMessage\": {\n"
-            "        \"body\": \"ezRemote Client\"\n"
-            "      },\n"
-            "      \"actions\": [\n"
-            "        {\n"
-            "          \"actionName\": \"Go to ezRemote Client\",\n"
-            "          \"actionType\": \"DeepLink\",\n"
-            "          \"defaultFocus\": true,\n"
-            "          \"parameters\": {\n"
-            "            \"actionUrl\": \"http://localhost:8080/hbldr?path=%s\"\n"
-            "          }\n"
-            "        }\n"
-            "      ]\n"
-            "    },\n"
-            "    \"platformViews\": {\n"
-            "      \"previewDisabled\": {\n"
-            "        \"viewData\": {\n"
-            "          \"icon\": {\n"
-            "            \"type\": \"Predefined\",\n"
-            "            \"parameters\": {\n"
-            "              \"icon\": \"community\"\n"
-            "            }\n"
-            "          },\n"
-            "          \"message\": {\n"
-            "            \"body\": \"%s\"\n"
-            "          }\n"
-            "        }\n"
-            "      }\n"
-            "    }\n"
-            "  },\n"
-            "  \"createdDateTime\": \"%s\",\n"
-            "  \"localNotificationId\": \"%s\"\n"
-            "}",
-            escaped_message, EZREMOTE_VERSION, CLIENT_ELF_PATH, escaped_message, created_at,
-            notification_id);
-
-        if (len < 0 || (size_t)len >= sizeof(payload))
-            return false;
-
-        int rc = sceNotificationSend(SCE_NOTIFICATION_LOCAL_USER_ID_SYSTEM, true,
-                                     payload);
-        return rc == 0;
-        */
-
-        return 0;
+        sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
     }
 
     static size_t NthOccurrence(const std::string &str, const std::string &findMe, int nth, size_t start_pos = 0, size_t end_pos = INT_MAX)

@@ -7,42 +7,78 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
-#include <orbis/libkernel.h>
-#include <orbis/Sysmodule.h>
-#include <orbis/SystemService.h>
-#include <orbis/Net.h>
 
 #include "server/http_server.h"
 #include "config.h"
 #include "util.h"
-#include "dbglogger.h"
 
 extern "C"
 {
-#include "orbis_jbc.h"
+    int sceNetInit(void);
+    int sceNetPoolCreate(const char *name, int size, int flags);
+    int sceNetPoolDestroy(int memid);
+    int sceNetTerm(void);
+    int sceKernelSendNotificationRequest(int, void *, size_t, int);
 }
 
-static void terminate()
+static int g_libnet_mem_id = -1;
+static volatile sig_atomic_t g_running = 1;
+
+static int NetInit(void)
 {
-    terminate_jbc();
-    sceSystemServiceLoadExec("exit", NULL);
+    if (sceNetInit() != 0)
+    {
+        errno = EIO;
+        return -1;
+    }
+
+    g_libnet_mem_id = sceNetPoolCreate("nanodns", 5 * 1024 * 1024, 0);
+    if (g_libnet_mem_id < 0)
+    {
+        errno = EIO;
+        if (sceNetTerm() != 0)
+        {
+            errno = EIO;
+        }
+        return -1;
+    }
+
+    return 0;
+}
+
+static void NetTerm(void)
+{
+    if (g_libnet_mem_id >= 0)
+    {
+        if (sceNetPoolDestroy(g_libnet_mem_id) != 0)
+        {
+            errno = EIO;
+        }
+        g_libnet_mem_id = -1;
+    }
+
+    if (sceNetTerm() != 0)
+    {
+        errno = EIO;
+    }
+}
+
+static void OnSignal(int signo)
+{
+    (void)signo;
+    g_running = 0;
 }
 
 int main(int argc, char *argv[])
 {
-    dbglogger_init();
-    dbglogger_log("If you see this you've set up dbglogger correctly.");
+    signal(SIGINT, OnSignal);
+    signal(SIGTERM, OnSignal);
 
-    if (!initialize_jbc())
+    if (NetInit() != 0)
     {
-        terminate();
+        NetTerm();
+        return -1;
     }
-
-    atexit(terminate);
-
-    if (sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_SYSTEM_SERVICE) < 0) return 0;
-    if (sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_USER_SERVICE) < 0) return 0;
-    if (sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_NET) < 0 || sceNetInit() != 0) return 0;
 
     CONFIG::LoadPackageInstallHostData();
     CONFIG::LoadBgDownloadData();
@@ -50,16 +86,14 @@ int main(int argc, char *argv[])
     if (HttpServer::IsStarted())
     {
         Util::Notify("ezRemote Server already started");
-        terminate();
+        NetTerm();
         return 0;
     }
-
-    dbglogger_log(" Registering Daemon...");
-    sceSystemServiceRegisterDaemon();
 
     HttpServer::StartDownloadThread();
     HttpServer::Start();
     Util::Notify("ezRemote Server stopped.");
 
+    NetTerm();
     return 0;
 }

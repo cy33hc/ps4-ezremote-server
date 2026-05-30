@@ -4,7 +4,6 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <time.h>
-#include <orbis/SystemService.h>
 #include "clients/remote_client.h"
 #include "clients/sftpclient.h"
 #include "fs.h"
@@ -225,7 +224,6 @@ int SFTPClient::Get(const std::string &outputfile, const std::string &path, uint
         {
             *g_bytes_transfered  += rc;
             FS::Write(out, buff, rc);
-            sceSystemServicePowerTick();
         }
         else
         {

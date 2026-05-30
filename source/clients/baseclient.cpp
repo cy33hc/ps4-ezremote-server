@@ -1,7 +1,6 @@
 #include <fstream>
 #include <curl/curl.h>
 #include <sys/time.h>
-#include <orbis/SystemService.h>
 #include "clients/remote_client.h"
 #include "clients/baseclient.h"
 #include "config.h"
@@ -91,7 +90,6 @@ int BaseClient::Get(const std::string &outputfile, const std::string &path, uint
                                {
                                    file_stream.write(data, data_length);
                                    *g_bytes_transfered = *g_bytes_transfered + data_length;
-                                   sceSystemServicePowerTick();
                                    return true;
                                }))
     {
@@ -119,7 +117,6 @@ int BaseClient::GetRange(const std::string &path, DataSink &sink, uint64_t size,
                                {
                                    bytes_read += data_length;
                                    bool ok = sink.write(data, data_length);
-                                   sceSystemServicePowerTick();
                                    return ok;
                                }))
     {

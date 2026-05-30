@@ -173,6 +173,7 @@ using socket_t = SOCKET;
 
 #include <arpa/inet.h>
 #if !defined(_AIX) && !defined(__MVS__)
+#include <sys/types.h>
 #include <ifaddrs.h>
 #endif
 #ifdef __MVS__

@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <errno.h>
-#include <orbis/SystemService.h>
 #include "clients/nfsclient.h"
 #include "config.h"
 #include "fs.h"
@@ -124,7 +123,7 @@ int NfsClient::Get(const std::string &outputfile, const std::string &ppath, uint
 		nfs_lseek(nfs, nfsfh, offset, SEEK_SET, NULL);
 	}
 
-	while ((count = nfs_read(nfs, nfsfh, BUF_SIZE, buff)) > 0)
+	while ((count = nfs_read(nfs, nfsfh, buff, BUF_SIZE)) > 0)
 	{
 		if (count < 0)
 		{
@@ -136,7 +135,6 @@ int NfsClient::Get(const std::string &outputfile, const std::string &ppath, uint
 		}
 		FS::Write(out, buff, count);
 		*g_bytes_transfered += count;
-		sceSystemServicePowerTick();
 	}
 
 	FS::Close(out);
@@ -179,7 +177,7 @@ int NfsClient::GetRange(void *fp, DataSink &sink, uint64_t size, uint64_t offset
 	do
 	{
 		size_t bytes_to_read = std::min<size_t>(BUF_SIZE, bytes_remaining);
-		count = nfs_read(nfs, nfsfh, bytes_to_read, buff);
+		count = nfs_read(nfs, nfsfh, buff, bytes_to_read);
 		if (count > 0)
 		{
 			bytes_remaining -= count;

@@ -217,7 +217,7 @@ namespace HttpServer
                     CONFIG::SaveBgDownloadData();
 
                     snprintf(temp_file, sizeof(temp_file), "%s.tmp", bg_download_list[i].dest_path.c_str());
-                    Util::RichNotify(bg_download_list[i].id, "Started download %s", bg_download_list[i].dest_path.c_str());
+                    Util::Notify("Started download %s", bg_download_list[i].dest_path.c_str());
 
                     ret = tmp_client->Get(temp_file, bg_download_list[i].src_path);
 
@@ -225,11 +225,11 @@ namespace HttpServer
                     if (ret == 0)
                     {
                         bg_download_list[i].state = STATE_FAILED;
-                        Util::RichNotify(bg_download_list[i].id, "Failed to download %s", bg_download_list[i].dest_path.c_str());
+                        Util::Notify("Failed to download %s", bg_download_list[i].dest_path.c_str());
                     }
                     else
                     {
-                        Util::RichNotify(bg_download_list[i].id, "Completed download %s", bg_download_list[i].dest_path.c_str());
+                        Util::Notify("Completed download %s", bg_download_list[i].dest_path.c_str());
                         bg_download_list[i].state = STATE_SUCCESS;
                     }
                     CONFIG::SaveBgDownloadData();
@@ -253,7 +253,7 @@ namespace HttpServer
 
                     snprintf(temp_file, sizeof(temp_file), "%s.tmp", bg_download_list[i].dest_path.c_str());
                     // Check if temp file still exists, if exists then resume download
-                    Util::RichNotify(bg_download_list[i].id, "Resuming download %s", bg_download_list[i].dest_path.c_str());
+                    Util::Notify("Resuming download %s", bg_download_list[i].dest_path.c_str());
                     if (FS::FileExists(temp_file))
                     {
                         tmp_file_size = FS::GetSize(temp_file);
@@ -270,11 +270,11 @@ namespace HttpServer
                     if (ret == 0)
                     {
                         bg_download_list[i].state = STATE_FAILED;
-                        Util::RichNotify(bg_download_list[i].id, "Failed to download %s", bg_download_list[i].dest_path.c_str());
+                        Util::Notify("Failed to download %s", bg_download_list[i].dest_path.c_str());
                     }
                     else
                     {
-                        Util::RichNotify(bg_download_list[i].id, "Completed download %s", bg_download_list[i].dest_path.c_str());
+                        Util::Notify("Completed download %s", bg_download_list[i].dest_path.c_str());
                         bg_download_list[i].state = STATE_SUCCESS;
                     }
                     CONFIG::SaveBgDownloadData();
