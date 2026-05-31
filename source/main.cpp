@@ -11,7 +11,7 @@
 #include "server/http_server.h"
 #include "config.h"
 #include "util.h"
-#include "dbglogger.h"
+// #include "dbglogger.h"
 
 extern "C"
 {
@@ -65,7 +65,6 @@ static void NetTerm(void)
 
 static void OnSignal()
 {
-    dbglogger_log("Terminating OnSignal");
     HttpServer::Stop();
     HttpServer::StopDownloadThread();
 }
@@ -78,8 +77,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    dbglogger_init();
-    dbglogger_log("If you see this you've set up dbglogger correctly.");
+    // dbglogger_init();
+    // dbglogger_log("If you see this you've set up dbglogger correctly.");
 
     CONFIG::LoadPackageInstallHostData();
     CONFIG::LoadBgDownloadData();

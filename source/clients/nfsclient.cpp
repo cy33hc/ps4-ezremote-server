@@ -50,6 +50,7 @@ int NfsClient::Connect(const std::string &url, const std::string &user, const st
 		nfs = nullptr;
 		return 0;
 	}
+
 	nfs_destroy_url(nfsurl);
 
 	connected = true;

@@ -128,23 +128,7 @@ namespace HttpServer
             {
                 tmp_client = new ArchiveOrgClient();
             }
-            else if (host_info->http_server_type.compare(HTTP_SERVER_APACHE))
-            {
-                tmp_client = new BaseClient();
-            }
-            else if (host_info->http_server_type.compare(HTTP_SERVER_MS_IIS))
-            {
-                tmp_client = new BaseClient();
-            }
-            else if (host_info->http_server_type.compare(HTTP_SERVER_NGINX))
-            {
-                tmp_client = new BaseClient();
-            }
-            else if (host_info->http_server_type.compare(HTTP_SERVER_RCLONE))
-            {
-                tmp_client = new BaseClient();
-            }
-            else if (host_info->http_server_type.compare(HTTP_SERVER_NPX_SERVE))
+            else
             {
                 tmp_client = new BaseClient();
             }
@@ -201,6 +185,11 @@ namespace HttpServer
                 if (bg_download_list[i].state == STATE_PENDING)
                 {
                     RemoteClient *tmp_client = GetRemoteClient(&(bg_download_list[i].host_info));
+                    if (tmp_client == nullptr)
+                    {
+                        break;
+                    }
+
                     g_bytes_transfered = &(bg_download_list[i].bytes_transfered);
                     if (bg_download_list[i].host_info.type == CLIENT_TYPE_FTP)
                     {
