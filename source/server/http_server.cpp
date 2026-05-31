@@ -187,7 +187,7 @@ namespace HttpServer
                     RemoteClient *tmp_client = GetRemoteClient(&(bg_download_list[i].host_info));
                     if (tmp_client == nullptr)
                     {
-                        break;
+                        continue;;
                     }
 
                     g_bytes_transfered = &(bg_download_list[i].bytes_transfered);
@@ -227,6 +227,11 @@ namespace HttpServer
                 {
                     // Resume interrupted download
                     RemoteClient *tmp_client = GetRemoteClient(&(bg_download_list[i].host_info));
+                    if (tmp_client == nullptr)
+                    {
+                        continue;
+                    }
+
                     g_bytes_transfered = &(bg_download_list[i].bytes_transfered);
                     if (bg_download_list[i].host_info.type == CLIENT_TYPE_FTP)
                     {
