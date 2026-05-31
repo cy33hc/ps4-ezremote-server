@@ -23,7 +23,6 @@ extern "C"
 }
 
 static int g_libnet_mem_id = -1;
-static volatile sig_atomic_t g_running = 1;
 
 static int NetInit(void)
 {
@@ -33,7 +32,7 @@ static int NetInit(void)
         return -1;
     }
 
-    g_libnet_mem_id = sceNetPoolCreate("nanodns", 5 * 1024 * 1024, 0);
+    g_libnet_mem_id = sceNetPoolCreate("ezremote_server", 5 * 1024 * 1024, 0);
     if (g_libnet_mem_id < 0)
     {
         errno = EIO;
@@ -64,17 +63,15 @@ static void NetTerm(void)
     }
 }
 
-static void OnSignal(int signo)
+static void OnSignal()
 {
-    (void)signo;
-    g_running = 0;
+    dbglogger_log("Terminating OnSignal");
+    HttpServer::Stop();
+    HttpServer::StopDownloadThread();
 }
 
 int main(int argc, char *argv[])
 {
-    signal(SIGINT, OnSignal);
-    signal(SIGTERM, OnSignal);
-
     if (NetInit() != 0)
     {
         NetTerm();
@@ -94,9 +91,12 @@ int main(int argc, char *argv[])
         return 0;
     }
 
+    atexit(OnSignal);
+
     HttpServer::StartDownloadThread();
     HttpServer::Start();
     Util::Notify("ezRemote Server stopped.");
+    HttpServer::StopDownloadThread();
 
     NetTerm();
     return 0;
