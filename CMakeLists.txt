@@ -4,7 +4,7 @@ project(ezremote-server)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDONT_HAVE_STRUPR -fno-builtin")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(APP_VERSION "1.00")
+set(APP_VERSION "1.01")
 
 add_definitions(-DCPPHTTPLIB_OPENSSL_SUPPORT)
 add_definitions(-DCPPHTTPLIB_THREAD_POOL_COUNT=64)
