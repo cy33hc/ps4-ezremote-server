@@ -13,7 +13,7 @@ include_directories(
   source
 )
 
-add_executable(${PROJECT_NAME}.elf
+add_executable(${PROJECT_NAME}-${APP_VERSION}.elf
   source/http/httplib.cpp
   source/server/http_server.cpp
   source/clients/archiveorg.cpp
@@ -30,9 +30,9 @@ add_executable(${PROJECT_NAME}.elf
   source/memccpy.c
   source/main.cpp)
 
-target_compile_definitions(${PROJECT_NAME}.elf PRIVATE EZREMOTE_VERSION=${APP_VERSION} CPPHTTPLIB_THREAD_POOL_COUNT=64)
+target_compile_definitions(${PROJECT_NAME}-${APP_VERSION}.elf PRIVATE EZREMOTE_VERSION=${APP_VERSION} CPPHTTPLIB_THREAD_POOL_COUNT=64)
 
-target_link_libraries(${PROJECT_NAME}.elf
+target_link_libraries(${PROJECT_NAME}-${APP_VERSION}.elf
   z
   crypto
   ssl
@@ -47,8 +47,8 @@ target_link_libraries(${PROJECT_NAME}.elf
 )
 
 add_custom_target(package
-   DEPENDS ${PROJECT_NAME}.elf
-   COMMAND /opt/ps4-payload-sdk/bin/orbis-strip ${PROJECT_NAME}.elf
-   COMMAND cp ${PROJECT_NAME}.elf ${CMAKE_CURRENT_SOURCE_DIR}/../data/daemon/daemon.elf
+   DEPENDS ${PROJECT_NAME}-${APP_VERSION}.elf
+   COMMAND /opt/ps4-payload-sdk/bin/orbis-strip ${PROJECT_NAME}-${APP_VERSION}.elf
+   COMMAND cp ${PROJECT_NAME}-${APP_VERSION}.elf ${CMAKE_CURRENT_SOURCE_DIR}/../data/daemon/daemon.elf
 
 )
