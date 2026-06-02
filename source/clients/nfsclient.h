@@ -24,7 +24,6 @@ public:
 	int Quit();
 
 private:
-	int _Rmdir(const std::string &ppath);
 	struct nfs_context *nfs;
 	char response[1024];
 	bool connected = false;
