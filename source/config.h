@@ -36,12 +36,12 @@ struct HostInfo
     std::string http_server_type;
     std::string username;
     std::string password;
+    RemoteClient *client;
 };
 
 struct PackageInstallData
 {
     HostInfo host_info;
-    RemoteClient *client;
     std::string path;
     uint64_t timestamp;
 };

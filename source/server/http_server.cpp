@@ -122,11 +122,17 @@ namespace HttpServer
     static RemoteClient *GetRemoteClient(HostInfo *host_info)
     {
         RemoteClient *tmp_client = nullptr;
-        if (host_info->type == CLIENT_TYPE_HTTP_SERVER)
+
+        if (host_info->client != nullptr)
         {
-            if (host_info->http_server_type.compare(HTTP_SERVER_ARCHIVEORG))
+            return host_info->client;
+        }
+        else if (host_info->type == CLIENT_TYPE_HTTP_SERVER)
+        {
+            if (host_info->http_server_type.compare(HTTP_SERVER_ARCHIVEORG) == 0)
             {
                 tmp_client = new ArchiveOrgClient();
+                host_info->client = tmp_client;
             }
             else
             {
@@ -168,8 +174,11 @@ namespace HttpServer
 
     static void DeleteRemoteClient(RemoteClient *tmp_client)
     {
-        tmp_client->Quit();
-        delete tmp_client;
+        if (!dynamic_cast<ArchiveOrgClient*>(tmp_client))
+        {
+            tmp_client->Quit();
+            delete tmp_client;
+        }
     }
 
     void *DownloadFilesThread(void *argp)
@@ -327,23 +336,11 @@ namespace HttpServer
                     pkg_data.host_info.http_server_type = http_server_type_param;
                 pkg_data.timestamp = Util::GetTick();
                 pkg_data.host_info.type = type_param;
-                pkg_data.client = nullptr;
+                pkg_data.host_info.client = nullptr;
 
                 CONFIG::AddPackageInstallHostData(hash_param, pkg_data);
                 CONFIG::SavePackageInstallHostData();
             }
-        });
-
-        svr->Get("/ls", [&](const Request &req, Response &res)
-        {
-            std::vector<std::string> files = FS::ListFiles("/");
-            std::string out;
-            for (int i=0; i < files.size(); i++)
-            {
-                out.append(files[i]).append("\n");
-            }
-
-            res.set_content(out, "text/plain");
         });
 
         svr->Get("/bg_install/(.*)", [&](const Request &req, Response &res)

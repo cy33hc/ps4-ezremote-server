@@ -37,6 +37,11 @@ std::string ArchiveOrgClient::GenerateRandomId(const int len)
 
 int ArchiveOrgClient::Connect(const std::string &url, const std::string &username, const std::string &password)
 {
+    std::lock_guard<std::mutex> lock(mtx);
+
+    if (this->connected)
+        return 1;
+
     this->host_url = url;
     size_t scheme_pos = url.find("://");
     size_t root_pos = url.find("/", scheme_pos + 3);
@@ -45,6 +50,7 @@ int ArchiveOrgClient::Connect(const std::string &url, const std::string &usernam
         this->host_url = url.substr(0, root_pos);
         this->base_path = url.substr(root_pos);
     }
+
     client = new httplib::Client(this->host_url);
     client->set_keep_alive(true);
     client->set_follow_location(true);
@@ -85,13 +91,12 @@ int ArchiveOrgClient::Login(const std::string &username, const std::string &pass
         {
             if (res->has_header("Set-Cookie"))
             {
-                int cookies_count = res->get_header_value_count("Set-Cookie");
+                auto range = res->headers.equal_range("Set-Cookie");
 
-                for (int i = 0; i < cookies_count; i++)
+                size_t index = 0;
+                for (auto range_it = range.first; range_it != range.second; ++range_it)
                 {
-                    std::string cookie_str = res->get_header_value("Set-Cookie", i);
-
-                    std::vector<std::string> cookies = Util::Split(cookie_str, ";");
+                    std::vector<std::string> cookies = Util::Split(range_it->second, ";");
                     for (std::vector<std::string>::iterator it = cookies.begin(); it != cookies.end();)
                     {
                         std::vector<std::string> cookie = Util::Split(*it, "=");
@@ -99,13 +104,18 @@ int ArchiveOrgClient::Login(const std::string &username, const std::string &pass
                         if (ignore_cookie_keys.find(key) == ignore_cookie_keys.end())
                         {
                             if (cookie.size() > 1)
+                            {
                                 this->cookies[key] = Util::Trim(cookie[1], " ");
+                            }
                             else
+                            {
                                 this->cookies[key] = "";
+                            }
                         }
                         ++it;
                     }
                 }
+
                 this->connected = true;
                 return 1;
             }

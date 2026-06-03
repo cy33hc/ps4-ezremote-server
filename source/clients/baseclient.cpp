@@ -115,6 +115,7 @@ int BaseClient::GetRange(const std::string &path, DataSink &sink, uint64_t size,
     if (auto res = client->Get(GetFullPath(path), headers,
                                [&](const char *data, size_t data_length)
                                {
+                                   std::string str = std::string(data, data_length);
                                    bytes_read += data_length;
                                    bool ok = sink.write(data, data_length);
                                    return ok;
