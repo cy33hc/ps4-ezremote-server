@@ -26,6 +26,7 @@ int http_server_port = 6701;
 static pthread_t bg_download_thread;
 static uint64_t g_dl_offset;
 static bool stop_download = false;
+static bool stop_server = false;
 
 namespace HttpServer
 {
@@ -232,7 +233,7 @@ namespace HttpServer
 
                     DeleteRemoteClient(tmp_client);
                 }
-                else if (bg_download_list[i].state == STATE_DOWNLOADING || (bg_download_list[i].state == STATE_FAILED && bg_download_list[i].failed_attempts < 3))
+                else if (bg_download_list[i].state == STATE_DOWNLOADING || (bg_download_list[i].state == STATE_FAILED && bg_download_list[i].failed_attempts < 5))
                 {
                     // Resume interrupted download
                     RemoteClient *tmp_client = GetRemoteClient(&(bg_download_list[i].host_info));
@@ -497,6 +498,7 @@ namespace HttpServer
  
         svr->Get("/stop", [&](const Request & /*req*/, Response & /*res*/)
         {
+            stop_server = true;
             svr->stop();
         });
 
@@ -540,13 +542,24 @@ namespace HttpServer
         {
             return;
         }
+        
+        while (!stop_server)
+        {
+            Util::Notify("Starting ezRemote Server %.2f on port %d", EZREMOTE_VERSION, http_server_port);
+            ServerThread(nullptr);
 
-        Util::Notify("Starting ezRemote Server %.2f on port %d", EZREMOTE_VERSION, http_server_port);
-        ServerThread(nullptr);
+            if (!stop_server)
+            {
+                sleep(3);
+                delete svr;
+                svr = new Server();
+            }
+        }
     }
 
     void Stop()
     {
+        stop_server = true;
         if (svr != nullptr)
             svr->stop();
     }
