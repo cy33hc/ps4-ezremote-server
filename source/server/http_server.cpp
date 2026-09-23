@@ -17,7 +17,8 @@
 #define SUCCESS_MSG "{ \"result\": { \"success\": true, \"error\": null } }"
 #define FAILURE_MSG "{ \"result\": { \"success\": false, \"error\": \"%s\" } }"
 #define SUCCESS_MSG_LEN 48
-#define PKG_INITIAL_REQUEST_SIZE 8388608ul
+#define MAX_PKG_REQUEST_SIZE 16777216ul
+#define MIN(a,b) (((a)<(b))?(a):(b))
 
 using namespace httplib;
 
@@ -406,7 +407,9 @@ namespace HttpServer
                 res.set_content_provider(
                     pkg_host_data->size, "application/octet-stream",
                     [tmp_client, path](size_t offset, size_t length, DataSink &sink) {
-                        int ret = tmp_client->GetRange(path, sink, length, offset);
+                        // On pkg initial request, the PS4 doesn't really need to get the full content of the pkg,
+                        // probably just to get the content length or check if pkg exists so just return the first 128kb
+                        int ret = tmp_client->GetRange(path, sink, (1024*128), offset);
                         return (ret == 1);
                     },
                     [tmp_client, path](bool success) {
@@ -420,7 +423,10 @@ namespace HttpServer
                     pkg_host_data->size, "application/octet-stream",
                     [tmp_client, path](size_t offset, size_t length, DataSink &sink) {
                         int ret;
-                        ret = tmp_client->GetRange(path, sink, length, offset);
+                        // On some pkg request, it range it from xxx-pkg_size which can be in several GBS.
+                        // Only return the MAX_PKG_REQUEST_SIZE of 16MB
+                        size_t read_length = MIN(length, MAX_PKG_REQUEST_SIZE);
+                        ret = tmp_client->GetRange(path, sink, read_length, offset);
                         return (ret==1);
                     },
                     [tmp_client, path](bool success) {
