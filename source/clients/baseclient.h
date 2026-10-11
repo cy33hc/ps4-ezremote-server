@@ -20,6 +20,7 @@ public:
     std::string GetFullPath(std::string path1);
     const char *LastResponse();
     int Quit();
+    void SetClientPathEncoding(bool enabled);
     static int DownloadProgressCallback(void* ptr, double dTotalToDownload, double dNowDownloaded, double dTotalToUpload, double dNowUploaded);
 
 protected:
