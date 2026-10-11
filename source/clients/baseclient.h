@@ -14,6 +14,7 @@ public:
     BaseClient();
     ~BaseClient();
     int Connect(const std::string &url, const std::string &username, const std::string &password);
+    int Connect(const std::string &url, const std::string &access_token);
 	int Get(const std::string &outputfile, const std::string &path, uint64_t offset=0);
     int GetRange(const std::string &path, DataSink &sink, uint64_t size, uint64_t offset);
     std::string GetPath(std::string path1, std::string path2);

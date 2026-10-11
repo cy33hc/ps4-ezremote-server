@@ -62,6 +62,29 @@ int BaseClient::Connect(const std::string &url, const std::string &username, con
     return 1;
 }
 
+int BaseClient::Connect(const std::string &url, const std::string &access_token)
+{
+    this->host_url = url;
+    size_t scheme_pos = url.find("://");
+    size_t root_pos = url.find("/", scheme_pos + 3);
+    if (root_pos != std::string::npos)
+    {
+        this->host_url = url.substr(0, root_pos);
+        this->base_path = url.substr(root_pos);
+    }
+    client = new httplib::Client(this->host_url);
+    if (access_token.length() > 0)
+        client->set_bearer_token_auth(access_token);
+    client->set_keep_alive(true);
+    client->set_follow_location(true);
+    client->set_connection_timeout(30);
+    client->set_read_timeout(30);
+    client->enable_server_certificate_verification(false);
+    this->connected = true;
+
+    return 1;
+}
+
 int BaseClient::Get(const std::string &outputfile, const std::string &path, uint64_t offset)
 {
     std::ofstream file_stream;

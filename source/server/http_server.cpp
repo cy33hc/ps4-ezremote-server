@@ -132,7 +132,7 @@ namespace HttpServer
         {
             return host_info->client;
         }
-        else if (host_info->type == CLIENT_TYPE_HTTP_SERVER)
+        else if (host_info->type == CLIENT_TYPE_HTTP_SERVER || host_info->type == CLIENT_TYPE_GOOGLE)
         {
             if (host_info->http_server_type.compare(HTTP_SERVER_ARCHIVEORG) == 0)
             {
@@ -173,7 +173,15 @@ namespace HttpServer
 
         if (tmp_client != nullptr)
         {
-            tmp_client->Connect(host_info->url, host_info->username, host_info->password);
+            if (host_info->type != CLIENT_TYPE_GOOGLE)
+            {
+                tmp_client->Connect(host_info->url, host_info->username, host_info->password);
+            }
+            else
+            {
+                BaseClient *base_client = (BaseClient*) tmp_client;
+                base_client->Connect(host_info->url, host_info->password);
+            }
 
             if (host_info->type == CLIENT_TYPE_HTTP_SERVER && host_info->http_server_type.compare(HTTP_SERVER_GITHUB) == 0)
             {
@@ -181,7 +189,7 @@ namespace HttpServer
                 base_client->SetClientPathEncoding(false);
             }
         }
-        
+
         return tmp_client;
     }
 
