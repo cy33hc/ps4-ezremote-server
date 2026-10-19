@@ -21,9 +21,11 @@ public:
 	int GetRange(const std::string &path, DataSink &sink, uint64_t size, uint64_t offset);
 	int GetRange(void *fp, DataSink &sink, uint64_t size, uint64_t offset);
 	const char *LastResponse();
+	bool IsConnected() const;
 	int Quit();
 
 private:
+	int _Rmdir(const std::string &ppath);
 	struct nfs_context *nfs;
 	char response[1024];
 	bool connected = false;
