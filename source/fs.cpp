@@ -96,14 +96,14 @@ namespace FS
 
     FILE *Create(const std::string &path)
     {
-        FILE *fd = fopen(path.c_str(), "w");
+        FILE *fd = fopen(path.c_str(), "wb");
 
         return fd;
     }
 
     FILE *OpenRW(const std::string &path)
     {
-        FILE *fd = fopen(path.c_str(), "w+");
+        FILE *fd = fopen(path.c_str(), "w+b");
         return fd;
     }
 
@@ -224,7 +224,7 @@ namespace FS
 
     bool Save(const std::string &path, const void *data, uint32_t size)
     {
-        FILE *fd = fopen(path.c_str(), "w+");
+        FILE *fd = fopen(path.c_str(), "w+b");
         if (fd == nullptr)
             return false;
 
@@ -265,14 +265,12 @@ namespace FS
 
             if (dirent->d_type & DT_DIR)
             {
-                /*
                 std::vector<std::string> files = FS::ListFiles(path + "/" + dirent->d_name);
                 for (std::vector<std::string>::iterator it = files.begin(); it != files.end();)
                 {
                     out.push_back(std::string(dirent->d_name) + "/" + *it);
                     ++it;
                 }
-                */
             }
             else
             {
