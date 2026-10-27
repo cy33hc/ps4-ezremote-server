@@ -13,15 +13,15 @@ class BaseClient : public RemoteClient
 public:
     BaseClient();
     ~BaseClient();
-    int Connect(const std::string &url, const std::string &username, const std::string &password);
+    int Connect(const std::string &url, const std::string &username, const std::string &password) override;
     int Connect(const std::string &url, const std::string &access_token);
-	int Get(const std::string &outputfile, const std::string &path, uint64_t offset=0);
-    int GetRange(const std::string &path, DataSink &sink, uint64_t size, uint64_t offset);
+    int Get(const std::string &outputfile, const std::string &path, uint64_t offset=0) override;
+    int GetRange(const std::string &path, DataSink &sink, uint64_t size, uint64_t offset) override;
     std::string GetPath(std::string path1, std::string path2);
     std::string GetFullPath(std::string path1);
-    const char *LastResponse();
-    int Quit();
-    bool IsConnected() const;
+    const char *LastResponse() override;
+    int Quit() override;
+    bool IsConnected() const override;
     void SetClientPathEncoding(bool enabled);
     uint32_t GetMaxIdleTimeout() const override;
 
