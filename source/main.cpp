@@ -149,9 +149,10 @@ int main(int argc, char *argv[])
 
     HttpServer::StartDownloadThread();
     HttpServer::Start();
-    Util::Notify("ezRemote Server stopped.");
     HttpServer::StopDownloadThread();
+    HttpServer::ClearClientPool();
     stop_monitoring = true;
+    Util::Notify("ezRemote Server stopped.");
 
     NetTerm();
     return 0;

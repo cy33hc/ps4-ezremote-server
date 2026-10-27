@@ -1386,6 +1386,16 @@ void FtpClient::SetCallbackBytes(int64_t bytes)
 	mp_ftphandle->cbbytes = bytes;
 }
 
+void FtpClient::ResetTransferState()
+{
+	// The transfer callback lives on the control handle and would otherwise be
+	// inherited by the next transfer. A null callback is the fresh-client state
+	// and is skipped by the transfer loops.
+	mp_ftphandle->xfercb = nullptr;
+	mp_ftphandle->cbarg = nullptr;
+	mp_ftphandle->cbbytes = 0;
+}
+
 long FtpClient::GetIdleTime()
 {
 	timeval now;

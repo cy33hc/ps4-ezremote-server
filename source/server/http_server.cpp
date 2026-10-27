@@ -124,19 +124,12 @@ namespace HttpServer
         return;
     }
 
-    static const size_t CLIENT_POOL_MAX_IDLE = 16;
-    static const time_t CLIENT_POOL_MAX_IDLE_SECONDS = 300;
+    static const size_t CLIENT_POOL_MAX_IDLE = 12;
 
     static std::mutex client_pool_mutex;
     static std::map<std::string, std::vector<RemoteClient *>> client_pool_idle;
     static std::map<RemoteClient *, std::string> client_pool_key;
     static std::map<RemoteClient *, time_t> client_pool_idle_since;
-
-    static bool IsPooledClientType(int type)
-    {
-        return type == CLIENT_TYPE_SMB || type == CLIENT_TYPE_SFTP ||
-               type == CLIENT_TYPE_NFS || type == CLIENT_TYPE_FTP;
-    }
 
     static std::string ClientPoolKey(const HostInfo &host_info)
     {
@@ -164,10 +157,46 @@ namespace HttpServer
         {
             client = new FtpClient();
         }
+        else if (host_info.type == CLIENT_TYPE_WEBDAV)
+        {
+            client = new WebDAVClient();
+        }
+        else if (host_info.type == CLIENT_TYPE_HTTP_SERVER || host_info.type == CLIENT_TYPE_GOOGLE)
+        {
+            if (host_info.http_server_type.compare(HTTP_SERVER_ARCHIVEORG) == 0)
+            {
+                client = new ArchiveOrgClient();
+            }
+            else
+            {
+                client = new BaseClient();
+            }
+        }
+        else if (host_info.type == CLIENT_TYPE_FILEHOST)
+        {
+            client = new BaseClient();
+        }
 
-        if (client != nullptr)
+        if (client == nullptr)
+        {
+            return nullptr;
+        }
+
+        if (host_info.type == CLIENT_TYPE_GOOGLE)
+        {
+            BaseClient *base_client = (BaseClient*) client;
+            base_client->Connect(host_info.url, host_info.password);
+        }
+        else
         {
             client->Connect(host_info.url, host_info.username, host_info.password);
+        }
+
+        if (host_info.type == CLIENT_TYPE_HTTP_SERVER &&
+            host_info.http_server_type.compare(HTTP_SERVER_GITHUB) == 0)
+        {
+            BaseClient *base_client = (BaseClient *)client;
+            base_client->SetClientPathEncoding(false);
         }
 
         return client;
@@ -175,31 +204,7 @@ namespace HttpServer
 
     static bool ClientIsConnected(RemoteClient *client)
     {
-        SmbClient *smb_client = dynamic_cast<SmbClient *>(client);
-        if (smb_client != nullptr)
-        {
-            return smb_client->IsConnected();
-        }
-
-        SFTPClient *sftp_client = dynamic_cast<SFTPClient *>(client);
-        if (sftp_client != nullptr)
-        {
-            return sftp_client->IsConnected();
-        }
-
-        NfsClient *nfs_client = dynamic_cast<NfsClient *>(client);
-        if (nfs_client != nullptr)
-        {
-            return nfs_client->IsConnected();
-        }
-
-        FtpClient *ftp_client = dynamic_cast<FtpClient *>(client);
-        if (ftp_client != nullptr)
-        {
-            return ftp_client->IsConnected();
-        }
-
-        return false;
+        return client != nullptr && client->IsConnected();
     }
 
     static void DestroyPooledClient(RemoteClient *client)
@@ -229,7 +234,7 @@ namespace HttpServer
 
                 auto idle_since = client_pool_idle_since.find(candidate);
                 bool too_old = idle_since != client_pool_idle_since.end() &&
-                               (time(NULL) - idle_since->second) > CLIENT_POOL_MAX_IDLE_SECONDS;
+                               (time(NULL) - idle_since->second) > (time_t)candidate->GetMaxIdleTimeout();
                 client_pool_idle_since.erase(candidate);
 
                 if (too_old)
@@ -267,17 +272,6 @@ namespace HttpServer
             }
         }
 
-        // The FTP transfer callback lives on the control handle and survives a
-        // transfer, so reset whatever the previous user installed before the
-        // client is handed out again.
-        if (host_info.type == CLIENT_TYPE_FTP)
-        {
-            FtpClient *ftp_client = (FtpClient *)client;
-            ftp_client->SetCallbackXferFunction(FtpCallback);
-            ftp_client->SetCallbackArg(nullptr);
-            ftp_client->SetCallbackBytes(0);
-        }
-
         return client;
     }
 
@@ -294,6 +288,7 @@ namespace HttpServer
                 std::vector<RemoteClient *> &idle = client_pool_idle[key->second];
                 if (idle.size() < CLIENT_POOL_MAX_IDLE)
                 {
+                    client->ResetTransferState();
                     idle.push_back(client);
                     client_pool_idle_since[client] = time(NULL);
                     pooled = true;
@@ -340,57 +335,6 @@ namespace HttpServer
         }
     }
 
-    static RemoteClient *GetRemoteClient(HostInfo *host_info, bool reusable)
-    {
-        if (host_info->client != nullptr)
-        {
-            return host_info->client;
-        }
-
-        if (IsPooledClientType(host_info->type))
-        {
-            // Pooled clients are already connected and are owned exclusively
-            // by the calling thread until they are released.
-            return AcquireRemoteClient(*host_info, reusable);
-        }
-
-        RemoteClient *tmp_client = nullptr;
-
-        if (host_info->type == CLIENT_TYPE_HTTP_SERVER)
-        {
-            if (host_info->http_server_type.compare(HTTP_SERVER_ARCHIVEORG) == 0)
-            {
-                tmp_client = new ArchiveOrgClient();
-                host_info->client = tmp_client;
-            }
-            else
-            {
-                tmp_client = new BaseClient();
-            }
-        }
-        else if (host_info->type == CLIENT_TYPE_WEBDAV)
-        {
-            tmp_client = new WebDAVClient();
-        }
-        else if (host_info->type == CLIENT_TYPE_FILEHOST)
-        {
-            tmp_client = new BaseClient();
-        }
-
-        if (tmp_client != nullptr)
-        {
-            tmp_client->Connect(host_info->url, host_info->username, host_info->password);
-
-            if (host_info->type == CLIENT_TYPE_HTTP_SERVER && host_info->http_server_type.compare(HTTP_SERVER_GITHUB) == 0)
-            {
-                BaseClient *base_client = (BaseClient*) tmp_client;
-                base_client->SetClientPathEncoding(false);
-            }
-        }
-
-        return tmp_client;
-    }
-
     // Returns a client to the pool. "success" says whether the last operation
     // on it succeeded; a client that failed is never handed out again. Clients
     // that were not acquired as reusable are not in the pool and get destroyed.
@@ -401,20 +345,7 @@ namespace HttpServer
             return;
         }
 
-        if (dynamic_cast<SmbClient *>(tmp_client) != nullptr ||
-            dynamic_cast<SFTPClient *>(tmp_client) != nullptr ||
-            dynamic_cast<NfsClient *>(tmp_client) != nullptr ||
-            dynamic_cast<FtpClient *>(tmp_client) != nullptr)
-        {
-            ReleasePooledClient(tmp_client, success);
-            return;
-        }
-
-        if (!dynamic_cast<ArchiveOrgClient*>(tmp_client))
-        {
-            tmp_client->Quit();
-            delete tmp_client;
-        }
+        ReleasePooledClient(tmp_client, success);
     }
 
     void *DownloadFilesThread(void *argp)
@@ -440,9 +371,10 @@ namespace HttpServer
             {
                 if (bg_download_list[i].state == STATE_PENDING)
                 {
-                    // A background download owns its client for the whole file,
-                    // so it gets a dedicated connection instead of a pooled one.
-                    RemoteClient *tmp_client = GetRemoteClient(&(bg_download_list[i].host_info), false);
+                    // The pool hands a client out exclusively, so the download
+                    // owns its connection for the whole file and returns it to
+                    // the pool when it is done.
+                    RemoteClient *tmp_client = AcquireRemoteClient(bg_download_list[i].host_info, true);
                     if (tmp_client == nullptr)
                     {
                         continue;;
@@ -473,7 +405,7 @@ namespace HttpServer
                             bg_download_list[i].state = STATE_FAILED;
                             Util::Notify("Failed to download %s", bg_download_list[i].dest_path.c_str());
                         }
-                        ReleaseRemoteClient(tmp_client, true);
+                        ReleaseRemoteClient(tmp_client, false);
                         sleep(5);
                         break;
                     }
@@ -490,9 +422,10 @@ namespace HttpServer
                 else if (bg_download_list[i].state == STATE_DOWNLOADING || (bg_download_list[i].state == STATE_FAILED && bg_download_list[i].failed_attempts < 5))
                 {
                     // Resume interrupted download
-                    // A background download owns its client for the whole file,
-                    // so it gets a dedicated connection instead of a pooled one.
-                    RemoteClient *tmp_client = GetRemoteClient(&(bg_download_list[i].host_info), false);
+                    // The pool hands a client out exclusively, so the download
+                    // owns its connection for the whole file and returns it to
+                    // the pool when it is done.
+                    RemoteClient *tmp_client = AcquireRemoteClient(bg_download_list[i].host_info, true);
                     if (tmp_client == nullptr)
                     {
                         continue;
@@ -536,7 +469,7 @@ namespace HttpServer
                                 CONFIG::SaveBgDownloadData();
                             }
                         }
-                        ReleaseRemoteClient(tmp_client, true);
+                        ReleaseRemoteClient(tmp_client, false);
                         sleep(bg_download_list[i].failed_attempts * 5);
                         break;
                     }
@@ -573,8 +506,8 @@ namespace HttpServer
             const char *username_param;
             const char *password_param;
             const char *http_server_type_param;
-            uint64_t file_size_param;
             int type_param;
+            uint64_t file_size;
 
             json_object *jobj = json_tokener_parse(req.body.c_str());
             if (jobj != nullptr)
@@ -586,7 +519,7 @@ namespace HttpServer
                 password_param = json_object_get_string(json_object_object_get(jobj, "password"));
                 http_server_type_param = json_object_get_string(json_object_object_get(jobj, "http_server_type"));
                 type_param = json_object_get_int(json_object_object_get(jobj, "type"));
-                file_size_param = json_object_get_uint64(json_object_object_get(jobj, "file_size"));
+                file_size = json_object_get_uint64(json_object_object_get(jobj, "file_size"));
 
                 if (url_param == nullptr || hash_param == nullptr)
                 {
@@ -607,8 +540,7 @@ namespace HttpServer
                     pkg_data.host_info.http_server_type = http_server_type_param;
                 pkg_data.timestamp = Util::GetTick();
                 pkg_data.host_info.type = type_param;
-                pkg_data.size = file_size_param;
-                pkg_data.host_info.client = nullptr;
+                pkg_data.size = file_size;
 
                 CONFIG::AddPackageInstallHostData(hash_param, pkg_data);
                 CONFIG::SavePackageInstallHostData();
@@ -630,7 +562,7 @@ namespace HttpServer
                 return;
             }
 
-            tmp_client = GetRemoteClient(&(pkg_host_data->host_info), true);
+            tmp_client = AcquireRemoteClient(pkg_host_data->host_info, true);
             if (tmp_client == nullptr)
             {
                 res.status = 500;
@@ -709,7 +641,6 @@ namespace HttpServer
                 BgDownloadData download_data;
                 download_data.host_info.type = type_param;
                 download_data.host_info.url = url_param;
-                download_data.host_info.client = nullptr;
                 download_data.src_path = src_path_param;
                 download_data.dest_path = dest_path_param;
                 download_data.file_size = file_size_param;

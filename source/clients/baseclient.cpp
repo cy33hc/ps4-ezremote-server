@@ -49,6 +49,13 @@ int BaseClient::Connect(const std::string &url, const std::string &username, con
         this->host_url = url.substr(0, root_pos);
         this->base_path = url.substr(root_pos);
     }
+
+    if (client != nullptr)
+    {
+        delete client;
+        client = nullptr;
+    }
+
     client = new httplib::Client(this->host_url);
     if (username.length() > 0)
         client->set_basic_auth(username, password);
@@ -138,7 +145,6 @@ int BaseClient::GetRange(const std::string &path, DataSink &sink, uint64_t size,
     if (auto res = client->Get(GetFullPath(path), headers,
                                [&](const char *data, size_t data_length)
                                {
-                                   std::string str = std::string(data, data_length);
                                    bytes_read += data_length;
                                    bool ok = sink.write(data, data_length);
                                    return ok;
@@ -186,7 +192,16 @@ int BaseClient::Quit()
         delete client;
         client = nullptr;
     }
+    this->connected = false;
     return 1;
+}
+
+bool BaseClient::IsConnected() const
+{
+    // httplib re-establishes a dropped keep-alive socket on the next request, so
+    // having a live Client handle is what this can cheaply verify. A transfer
+    // that actually fails is reported through "success" when it is released.
+    return this->connected && this->client != nullptr;
 }
 
 void BaseClient::SetClientPathEncoding(bool enabled)
@@ -195,4 +210,9 @@ void BaseClient::SetClientPathEncoding(bool enabled)
     {
         this->client->set_url_encode(enabled);
     }
+}
+
+uint32_t BaseClient::GetMaxIdleTimeout() const
+{
+	return 7 * 24 * 60 * 60;
 }

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 #include "http/httplib.h"
 
 enum ClientType
@@ -30,6 +31,9 @@ public:
     virtual int GetRange(const std::string &path, DataSink &sink, uint64_t size, uint64_t offset) = 0;
     virtual const char *LastResponse() = 0;
     virtual int Quit() = 0;
+    virtual bool IsConnected() const = 0;
+    virtual void ResetTransferState() {}
+    virtual uint32_t GetMaxIdleTimeout() const { return 5 * 60; }
 };
 
 #endif
