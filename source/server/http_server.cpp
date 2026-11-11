@@ -1,7 +1,10 @@
+#include <stdint.h>
+#include <stddef.h>
 #include <string>
 #include <json-c/json.h>
 #include "http/httplib.h"
 #include "server/http_server.h"
+#include "server/icon0_png.h"
 #include "clients/remote_client.h"
 #include "clients/archiveorg.h"
 #include "clients/baseclient.h"
@@ -16,11 +19,32 @@
 #include "json_object_ref.h"
 #include "util.h"
 
+#define EZREMOTE_TITLE_ID "RMTC00001"
+
 #define SUCCESS_MSG "{ \"result\": { \"success\": true, \"error\": null } }"
 #define FAILURE_MSG "{ \"result\": { \"success\": false, \"error\": \"%s\" } }"
 #define SUCCESS_MSG_LEN 48
 #define MAX_PKG_REQUEST_SIZE 16777216ul
 #define MIN(a,b) (((a)<(b))?(a):(b))
+
+// Structure required by sceSystemServiceLaunchApp
+typedef struct {
+    uint32_t size;
+    int32_t userId;
+    uint32_t appAttr;
+    uint32_t enableCrashReport;
+    uint64_t checkFlag;
+} LncAppParam;
+
+// Function pointer declaration if not already defined in your SDK headers
+extern "C" {
+int sceUserServiceInitialize(void* params);
+int sceUserServiceTerminate(void);
+int sceUserServiceGetForegroundUser(int32_t* userId);
+int sceUserServiceGetInitialUser(int32_t* userId);
+int sceLncUtilInitialize(void);
+int sceLncUtilLaunchApp(const char* titleIdOrUri, const char* argv[], LncAppParam* param);
+}
 
 using namespace httplib;
 
@@ -33,6 +57,7 @@ static bool stop_server = false;
 static bool in_rest_mode = false;
 static pthread_mutex_t download_pause_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t download_pause_cond = PTHREAD_COND_INITIALIZER;
+int ezremote_client_port = 8080;
 
 namespace HttpServer
 {
@@ -354,6 +379,29 @@ namespace HttpServer
         ReleasePooledClient(tmp_client, success);
     }
 
+    void launch_game_by_title_id(const char* titleId)
+    {
+        int32_t userId = -1;
+        sceUserServiceInitialize(NULL);
+        if (sceUserServiceGetForegroundUser(&userId) < 0 || userId <= 0) {
+            // Fallback to the initial logged-in user
+            if (sceUserServiceGetInitialUser) {
+                sceUserServiceGetInitialUser(&userId);
+            }
+        }
+
+        sceLncUtilInitialize();
+
+        LncAppParam param;
+        param.size = sizeof(LncAppParam);
+        param.userId = userId; // -1 launches under the current active user
+        param.appAttr = 0;
+        param.enableCrashReport = 0;
+        param.checkFlag = 0;
+
+        sceLncUtilLaunchApp(titleId, NULL, &param);
+    }
+
     void *DownloadFilesThread(void *argp)
     {
         char temp_file[2049];
@@ -647,6 +695,259 @@ namespace HttpServer
             res.set_content(payload_str, "application/json");
         });
  
+        svr->Get("/start_client.html", [&](const Request & /*req*/, Response &res)
+        {
+            char version[20];
+            sprintf(version, "%.2f", EZREMOTE_VERSION);
+
+            std::string page = R"HTML(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ezRemote Client</title>
+<style>
+  :root {
+    --bg: #1b1b1c;
+    --panel: #252526;
+    --panel-alt: #2d2d30;
+    --line: #3f3f46;
+    --text: #e4e4e4;
+    --muted: #979797;
+    --accent: #1d97ec;
+    --accent-deep: #0077c8;
+    --mint: #57a64a;
+    --rose: #f14c4c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background:
+      radial-gradient(900px 500px at 50% -10%, rgba(29, 151, 236, 0.18), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .card {
+    width: 100%;
+    max-width: 460px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    background: linear-gradient(180deg, var(--panel-alt), var(--panel) 40%);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    padding: 36px 32px 32px;
+    text-align: center;
+  }
+  .logo {
+    width: 112px;
+    height: 112px;
+    margin: 0 auto 22px;
+    display: block;
+    border-radius: 24px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    background: var(--panel-alt);
+    object-fit: cover;
+  }
+  .logo.fallback {
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    color: var(--accent);
+    font-size: 44px;
+    font-weight: 700;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.65rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    margin: 8px 0 0;
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .status {
+    margin: 22px 0 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    min-height: 20px;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 200ms ease;
+  }
+  .dot.on { background: var(--mint); box-shadow: 0 0 10px rgba(87, 166, 74, 0.7); }
+  .dot.off { background: var(--rose); box-shadow: 0 0 10px rgba(241, 76, 76, 0.6); }
+  .launch {
+    margin-top: 26px;
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border: 1px solid rgba(29, 151, 236, 0.45);
+    border-radius: 12px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+    transition: filter 150ms ease, transform 150ms ease;
+  }
+  .launch:hover { filter: brightness(1.1); }
+  .launch:active { transform: translateY(1px); }
+  .launch[aria-disabled="true"] { opacity: 0.55; pointer-events: none; }
+  .hint {
+    margin: 18px 0 0;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    animation: spin 700ms linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <main class="card">
+    <img class="logo" src="/icon0.png" alt="ezRemote Client" onerror="this.classList.add('fallback');this.outerHTML='<div class=&quot;logo fallback&quot;>ez</div>';">
+    <h1>ezRemote Client</h1>
+    <p class="subtitle">ezRemote Server v{{VERSION}}</p>
+
+    <div class="status">
+      <span class="dot" id="dot"></span>
+      <span id="status">Checking whether the client is running…</span>
+    </div>
+
+    <a class="launch" id="launch" href="/start_client">
+      <span id="launch-label">Launch ezRemote Client</span>
+    </a>
+
+    <p class="hint">
+      Starts ezRemote Client through the loader and opens its web UI.<br>
+      If it is already running, you are taken straight to it.
+    </p>
+  </main>
+
+  <script>
+    const launch = document.getElementById("launch");
+    const label = document.getElementById("launch-label");
+    const dot = document.getElementById("dot");
+    const status = document.getElementById("status");
+
+    async function probe() {
+      try {
+        const response = await fetch(`//${location.hostname}:{{CLIENT_PORT}}/version`, { cache: "no-store" });
+        const running = response.ok;
+        dot.className = "dot " + (running ? "on" : "off");
+        status.textContent = running ? "Client is running" : "Client is not running";
+      } catch {
+        dot.className = "dot off";
+        status.textContent = "Client is not running";
+      }
+    }
+
+    launch.addEventListener("click", () => {
+      launch.setAttribute("aria-disabled", "true");
+      label.innerHTML = '<span class="spinner"></span> Starting…';
+      status.textContent = "Launching the client, this can take a few seconds";
+    });
+
+    probe();
+    setInterval(probe, 5000);
+  </script>
+</body>
+</html>)HTML";
+
+            const char *marker = "{{VERSION}}";
+            size_t pos = page.find(marker);
+            if (pos != std::string::npos)
+                page.replace(pos, strlen(marker), version);
+
+            // The launch page probes the client's web UI directly, so it needs
+            // the port the client is currently configured on rather than the
+            // default baked into the template.
+            const char *port_marker = "{{CLIENT_PORT}}";
+            std::string port = std::to_string(ezremote_client_port);
+            size_t port_pos = page.find(port_marker);
+            if (port_pos != std::string::npos)
+                page.replace(port_pos, strlen(port_marker), port);
+
+            res.status = 200;
+            res.set_header("Cache-Control", "no-store");
+            res.set_content(page, "text/html");
+        });
+
+        svr->Get("/start_client", [&](const Request &req, Response &res)
+        {
+            bool started = false;
+            launch_game_by_title_id(EZREMOTE_TITLE_ID);
+
+            for (int attempt = 0; attempt < 15 && !started; attempt++)
+            {
+                sleep(1);
+
+                httplib::Client check("127.0.0.1", ezremote_client_port);
+                check.set_connection_timeout(1, 0);
+                check.set_read_timeout(1, 0);
+                auto result = check.Get("/version");
+                if (result && result->status == 200)
+                {
+                    started = true;
+                    break;
+                }
+            }
+
+            if (!started)
+            {
+                res.status = 200;
+                res.set_content("<html><body><p>ezRemote Client did not start. Check that the loader is running.</p></body></html>", "text/html");
+                return;
+            }
+
+            // The console the browser reached us on, on the client's own port.
+            std::string host = req.get_header_value("Host");
+            size_t colon = host.find(':');
+            if (colon != std::string::npos)
+                host = host.substr(0, colon);
+            if (host.empty())
+                host = "127.0.0.1";
+
+            res.set_redirect("http://" + host + ":" + std::to_string(ezremote_client_port) + "/index.html");
+        });
+
+        svr->Post("/change_ezremote_client_port", [&](const Request & req, Response &res)
+        {
+            ezremote_client_port = std::stoi(req.body);
+            res.status = 200;
+        });
+
+        svr->Get("/icon0.png", [&](const Request & /*req*/, Response &res)
+        {
+            res.set_header("Cache-Control", "public, max-age=31536000, immutable");
+            res.set_content(reinterpret_cast<const char *>(icon0_png), icon0_png_len, "image/png");
+        });
+
         svr->Get("/stop", [&](const Request & /*req*/, Response & /*res*/)
         {
             stop_server = true;

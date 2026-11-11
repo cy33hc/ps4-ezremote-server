@@ -4,7 +4,7 @@ project(ezremote-server)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDONT_HAVE_STRUPR -fno-builtin")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(APP_VERSION "1.09")
+set(APP_VERSION "1.10")
 
 add_definitions(-DCPPHTTPLIB_OPENSSL_SUPPORT)
 add_definitions(-DCPPHTTPLIB_THREAD_POOL_COUNT=64)
@@ -28,6 +28,7 @@ add_executable(${PROJECT_NAME}-${APP_VERSION}.elf
   source/crypt.c
   source/dbglogger.c
   source/fs.cpp
+  source/inifile.c
   source/memccpy.c
   source/main.cpp)
 
@@ -44,6 +45,7 @@ target_link_libraries(${PROJECT_NAME}-${APP_VERSION}.elf
   kernel_sys
   SceSysmodule
   SceNet
+  SceUserService
   SceSystemService
 )
 

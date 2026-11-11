@@ -131,6 +131,7 @@ int main(int argc, char *argv[])
     // dbglogger_init();
     // dbglogger_log("If you see this you've set up dbglogger correctly.");
 
+    CONFIG::LoadConfig();
     CONFIG::LoadPackageInstallHostData();
     CONFIG::LoadBgDownloadData();
 
