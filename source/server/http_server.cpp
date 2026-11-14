@@ -379,17 +379,8 @@ namespace HttpServer
         ReleasePooledClient(tmp_client, success);
     }
 
-    void launch_game_by_title_id(const char* titleId)
+    void launch_game_by_title_id(const char* titleId, const int userId)
     {
-        int32_t userId = -1;
-        sceUserServiceInitialize(NULL);
-        if (sceUserServiceGetForegroundUser(&userId) < 0 || userId <= 0) {
-            // Fallback to the initial logged-in user
-            if (sceUserServiceGetInitialUser) {
-                sceUserServiceGetInitialUser(&userId);
-            }
-        }
-
         sceLncUtilInitialize();
 
         LncAppParam param;
@@ -901,7 +892,15 @@ namespace HttpServer
         svr->Get("/start_client", [&](const Request &req, Response &res)
         {
             bool started = false;
-            launch_game_by_title_id(EZREMOTE_TITLE_ID);
+            int32_t userId = -1;
+            sceUserServiceInitialize(NULL);
+            if (sceUserServiceGetForegroundUser(&userId) < 0 || userId <= 0) {
+                res.status = 200;
+                res.set_content("<html><body><p>Cannot start ezRemote Client. User needs to be signed in on the PS4.</p></body></html>", "text/html");
+                return;
+            }
+
+            launch_game_by_title_id(EZREMOTE_TITLE_ID, userId);
 
             for (int attempt = 0; attempt < 15 && !started; attempt++)
             {
