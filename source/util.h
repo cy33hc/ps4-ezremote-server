@@ -12,9 +12,7 @@
 #include "openssl/md5.h"
 #include "config.h"
 
-extern "C" {
-int sceKernelSendNotificationRequest(int, void *, size_t, int);
-}
+#include <orbis/libkernel.h>
 
 typedef struct notify_request {
   char useless1[45];
@@ -182,7 +180,7 @@ namespace Util
         vsprintf(req.message, fmt, args);
         va_end(args);
 
-        sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+        sceKernelSendNotificationRequest(0, (OrbisNotificationRequest *)&req, sizeof(req), 0);
     }
 
     static size_t NthOccurrence(const std::string &str, const std::string &findMe, int nth, size_t start_pos = 0, size_t end_pos = INT_MAX)

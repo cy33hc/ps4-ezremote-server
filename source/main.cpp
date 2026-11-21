@@ -7,10 +7,16 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <orbis/Sysmodule.h>
 
 #include "server/http_server.h"
 #include "config.h"
 #include "util.h"
+
+extern "C"
+{
+#include "orbis_jbc.h"
+}
 // #include "dbglogger.h"
 
 #define SCE_SYSTEM_SERVICE_EVENT_ON_RESUME  0x10000000u
@@ -27,8 +33,8 @@ extern "C"
     int sceNetPoolCreate(const char *name, int size, int flags);
     int sceNetPoolDestroy(int memid);
     int sceNetTerm(void);
-    int sceKernelSendNotificationRequest(int, void *, size_t, int);
     int sceSystemServiceReceiveEvent(SceSystemServiceEvent *event);
+    int sceSystemServiceLoadExec(const char *path, const char *args[]);
 }
 
 static int g_libnet_mem_id = -1;
@@ -112,17 +118,25 @@ static void NetTerm(void)
     }
 }
 
-static void OnSignal()
-{
-    HttpServer::Stop();
-    HttpServer::StopDownloadThread();
-}
-
 int main(int argc, char *argv[])
 {
+    if (!initialize_jbc())
+    {
+        return -1;
+    }
+
+    if (sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_SYSTEM_SERVICE) < 0 ||
+        sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_USER_SERVICE) < 0 ||
+        sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_NET) < 0)
+    {
+        terminate_jbc();
+        return -1;
+    }
+
     if (NetInit() != 0)
     {
         NetTerm();
+        terminate_jbc();
         return -1;
     }
 
@@ -139,10 +153,10 @@ int main(int argc, char *argv[])
     {
         Util::Notify("ezRemote Server already started");
         NetTerm();
+        terminate_jbc();
+        sceSystemServiceLoadExec("exit", NULL);
         return 0;
     }
-
-    atexit(OnSignal);
 
     // Start system event monitoring thread
     pthread_t sys_event_thread;
@@ -156,5 +170,8 @@ int main(int argc, char *argv[])
     Util::Notify("ezRemote Server stopped.");
 
     NetTerm();
+    terminate_jbc();
+
+    sceSystemServiceLoadExec("exit", NULL);
     return 0;
 }

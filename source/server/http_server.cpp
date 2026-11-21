@@ -19,8 +19,6 @@
 #include "json_object_ref.h"
 #include "util.h"
 
-#define EZREMOTE_TITLE_ID "RMTC00001"
-
 #define SUCCESS_MSG "{ \"result\": { \"success\": true, \"error\": null } }"
 #define FAILURE_MSG "{ \"result\": { \"success\": false, \"error\": \"%s\" } }"
 #define SUCCESS_MSG_LEN 48
@@ -932,6 +930,38 @@ namespace HttpServer
             res.set_content(page, "text/html");
         });
 
+        svr->Post("/set_headless_mode", [&](const Request &req, Response &res)
+        {
+            bool enabled = false;
+            json_object *jobj = json_tokener_parse(req.body.c_str());
+            if (jobj != nullptr)
+            {
+                json_object *value = json_object_object_get(jobj, "headless_mode");
+                if (value == nullptr)
+                    value = json_object_object_get(jobj, "headlessMode");
+                if (value != nullptr)
+                    enabled = json_object_get_boolean(value) != 0;
+                else if (json_object_is_type(jobj, json_type_boolean))
+                    enabled = json_object_get_boolean(jobj) != 0;
+                else if (json_object_is_type(jobj, json_type_int))
+                    enabled = json_object_get_int(jobj) != 0;
+                else if (json_object_is_type(jobj, json_type_string))
+                {
+                    const char *text = json_object_get_string(jobj);
+                    enabled = text != nullptr && (strcmp(text, "1") == 0 || strcasecmp(text, "true") == 0);
+                }
+                json_object_put(jobj);
+            }
+            else
+            {
+                enabled = req.body == "1" || req.body == "true";
+            }
+
+            CONFIG::SetHeadlessMode(enabled);
+            res.status = 200;
+            res.set_content(enabled ? "1" : "0", "text/plain");
+        });
+
         svr->Get("/start_client", [&](const Request &req, Response &res)
         {
             bool started = false;
@@ -943,7 +973,7 @@ namespace HttpServer
                 return;
             }
 
-            launch_game_by_title_id(EZREMOTE_TITLE_ID, userId);
+            launch_game_by_title_id(headless_mode ? EZREMOTE_HEADLESS_CLIENT_TITLE_ID : EZREMOTE_CLIENT_TITLE_ID, userId);
 
             for (int attempt = 0; attempt < 15 && !started; attempt++)
             {

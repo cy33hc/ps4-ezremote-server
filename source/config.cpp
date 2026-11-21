@@ -5,7 +5,7 @@
 #include <vector>
 #include <deque>
 #include <regex>
-#include <shared_mutex>
+#include <mutex>
 #include <stdlib.h>
 #include <json-c/json.h>
 #include "server/http_server.h"
@@ -33,8 +33,9 @@ std::deque<BgDownloadData> bg_download_list;
 unsigned char cipher_key[32] = {'s', '5', 'v', '8', 'y', '/', 'B', '?', 'E', '(', 'H', '+', 'M', 'b', 'Q', 'e', 'T', 'h', 'W', 'm', 'Z', 'q', '4', 't', '7', 'w', '9', 'z', '$', 'C', '&', 'F'};
 unsigned char cipher_iv[16] = {'Y', 'p', '3', 's', '6', 'v', '9', 'y', '$', 'B', '&', 'E', ')', 'H', '@', 'M'};
 
-std::shared_mutex pkg_mutex_;
-std::shared_mutex download_mutex_;
+std::mutex pkg_mutex_;
+std::mutex download_mutex_;
+bool headless_mode = false;
 uint64_t *g_bytes_transfered;
 
 namespace CONFIG
@@ -74,12 +75,19 @@ namespace CONFIG
     {
         OpenIniFile(CONFIG_INI_FILE);
         ezremote_client_port = ReadInt(CONFIG_HTTP_SERVER, CONFIG_EZREMOTE_CLIENT_PORT, 9090);
+        headless_mode = ReadBool(CONFIG_GLOBAL, CONFIG_HEADLESS_MODE, false);
         CloseIniFile();
+    }
+
+    void SetHeadlessMode(bool enabled)
+    {
+        // The client owns config.ini; this only updates the running server.
+        headless_mode = enabled;
     }
 
 	std::shared_ptr<PackageInstallData> GetPackageInstallHostData(const std::string &hash)
 	{
-        std::shared_lock<std::shared_mutex> lock(pkg_mutex_);
+        std::lock_guard<std::mutex> lock(pkg_mutex_);
         auto it = pkg_install_history.find(hash);
         if (it == pkg_install_history.end())
             return nullptr;
@@ -88,13 +96,13 @@ namespace CONFIG
 
 	void AddPackageInstallHostData(const std::string &hash, PackageInstallData pkg_data)
 	{
-		std::unique_lock<std::shared_mutex> lock(pkg_mutex_);
+		std::unique_lock<std::mutex> lock(pkg_mutex_);
 		pkg_install_history[hash] = std::make_shared<PackageInstallData>(pkg_data);
 	}
 
 	void RemovePackageInstallHostData(const std::string &hash)
 	{
-		std::unique_lock<std::shared_mutex> lock(pkg_mutex_);
+		std::unique_lock<std::mutex> lock(pkg_mutex_);
 		pkg_install_history.erase(hash);
 	}
 
@@ -149,7 +157,7 @@ namespace CONFIG
 
     void SavePackageInstallHostData()
     {
-        std::unique_lock<std::shared_mutex> lock(pkg_mutex_);
+        std::unique_lock<std::mutex> lock(pkg_mutex_);
 
         if (!FS::FolderExists(DATA_PATH))
         {
@@ -203,7 +211,7 @@ namespace CONFIG
 
 	void AddBgDownloadData(BgDownloadData pkg_data)
 	{
-		std::unique_lock<std::shared_mutex> lock(download_mutex_);
+		std::unique_lock<std::mutex> lock(download_mutex_);
 		bg_download_list.push_back(pkg_data);
 	}
 
@@ -264,7 +272,7 @@ namespace CONFIG
 
     void SaveBgDownloadData()
     {
-        std::unique_lock<std::shared_mutex> lock(download_mutex_);
+        std::unique_lock<std::mutex> lock(download_mutex_);
 
         if (!FS::FolderExists(DATA_PATH))
         {
