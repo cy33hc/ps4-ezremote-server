@@ -35,6 +35,7 @@ unsigned char cipher_iv[16] = {'Y', 'p', '3', 's', '6', 'v', '9', 'y', '$', 'B',
 
 std::shared_mutex pkg_mutex_;
 std::shared_mutex download_mutex_;
+bool headless_mode = false;
 uint64_t *g_bytes_transfered;
 
 namespace CONFIG
@@ -74,6 +75,7 @@ namespace CONFIG
     {
         OpenIniFile(CONFIG_INI_FILE);
         ezremote_client_port = ReadInt(CONFIG_HTTP_SERVER, CONFIG_EZREMOTE_CLIENT_PORT, 9090);
+        headless_mode = ReadBool(CONFIG_GLOBAL, CONFIG_HEADLESS_MODE, false);
         CloseIniFile();
     }
 

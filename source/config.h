@@ -13,6 +13,8 @@
 #include "clients/remote_client.h"
 
 #define APP_ID "ezremote-client"
+#define EZREMOTE_CLIENT_TITLE_ID "RMTC00001"
+#define EZREMOTE_HEADLESS_CLIENT_TITLE_ID "EZRC00001"
 #define DATA_PATH "/data/" APP_ID
 #define PKG_INSTALL_HISTORY_PATH DATA_PATH "/pkg_install_history.json"
 #define BG_DOWNLOAD_HISTORY_PATH DATA_PATH "/bg_download_history.json"
@@ -27,7 +29,12 @@
 #define HTTP_SERVER_MYRIENT "Myrient"
 #define HTTP_SERVER_GITHUB "Github"
 
+#define CONFIG_GLOBAL "Global"
+#define CONFIG_HEADLESS_MODE "headless_mode"
+
 #define MAX_PKG_HISTORY_RETENTION 1209600000000L
+
+extern bool headless_mode;
 
 enum DownloadState { STATE_PENDING, STATE_DOWNLOADING, STATE_RESUMED, STATE_FAILED, STATE_SUCCESS };
 

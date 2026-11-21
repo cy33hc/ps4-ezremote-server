@@ -52,6 +52,6 @@ target_link_libraries(${PROJECT_NAME}-${APP_VERSION}.elf
 add_custom_target(package
    DEPENDS ${PROJECT_NAME}-${APP_VERSION}.elf
    COMMAND /opt/ps4-payload-sdk/bin/orbis-strip ${PROJECT_NAME}-${APP_VERSION}.elf
-   COMMAND cp ${PROJECT_NAME}-${APP_VERSION}.elf ${CMAKE_CURRENT_SOURCE_DIR}/../data/daemon/daemon.elf
+   COMMAND cp ${PROJECT_NAME}-${APP_VERSION}.elf ${CMAKE_CURRENT_SOURCE_DIR}/../data/daemon/ezremote-server.elf
 
 )
